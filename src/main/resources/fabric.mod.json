@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "dragonegghearts",
+  "version": "${version}",
+  "name": "Dragon Egg Hearts",
+  "description": "Grants configurable bonus health while carrying a Dragon Egg.",
+  "authors": ["ilikemycatt"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.example.dragonegg.DragonEggHeartsMod"
+    ]
+  },
+  "mixins": [
+    "dragonegghearts.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
