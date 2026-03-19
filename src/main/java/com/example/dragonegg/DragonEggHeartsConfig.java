@@ -37,6 +37,8 @@ public final class DragonEggHeartsConfig {
         }
 
         sanitize();
+        // Backfill newly added config fields into existing config files.
+        save();
     }
 
     public static ConfigData get() {
@@ -46,6 +48,9 @@ public final class DragonEggHeartsConfig {
     private static void sanitize() {
         if (data.extraHearts < 0.0) {
             data.extraHearts = 0.0;
+        }
+        if (data.eggCoordsMessageIntervalTicks < 20) {
+            data.eggCoordsMessageIntervalTicks = 20;
         }
     }
 
@@ -64,7 +69,18 @@ public final class DragonEggHeartsConfig {
         public boolean outline = true;
         public boolean redPlayerName = true;
         public boolean allowStorageInContainers = false;
+        public boolean debugLogging = false;
+        public boolean endermanIgnoreStareForEggCarriers = true;
+        public boolean angerNeutralMobsToEggCarriers = true;
+        public boolean prioritizeHostilesToEggCarriers = true;
+        public boolean blockAllayEggInteractions = true;
+        public boolean blockEggUseOnItemFrames = true;
+        public boolean blockFoxEggPickup = true;
+        public boolean blockHopperEggInsertion = true;
+        public boolean announceEggCoordinates = true;
+        public boolean restoreEggToEndPortalOnLoss = true;
         public double extraHearts = 10.0;
+        public int eggCoordsMessageIntervalTicks = 72000;
 
         public double extraHealthAmount() {
             if (doubleHearts) {

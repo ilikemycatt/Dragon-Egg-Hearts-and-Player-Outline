@@ -3,10 +3,24 @@
   "package": "com.example.dragonegg.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "AllayEntityMixin",
+    "BlockItemMixin",
     "BundleContentsComponentMixin",
+    "DragonEggBlockMixin",
+    "EndermanEntityMixin",
+    "FallingBlockEntityMixin",
+    "FoxEntityMixin",
+    "HopperBlockEntityMixin",
+    "ItemEntityMixin",
+    "ItemStackMixin",
+    "LivingEntityMixin",
+    "PlayerEntityMixin",
     "ScreenHandlerMixin",
+    "ServerPlayNetworkHandlerMixin",
+    "ServerPlayNetworkHandlerInteractMixin",
     "ShulkerBoxSlotMixin",
-    "SlotMixin"
+    "SlotMixin",
+    "WorldSetBlockStateMixin"
   ],
   "injectors": {
     "defaultRequire": 1
