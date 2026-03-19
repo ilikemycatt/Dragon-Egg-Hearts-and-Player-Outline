@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.6 - 2026-03-19
+## 1.0.1 - 2026-03-19
 - Added new config toggles for previously hardcoded behavior:
   - `endermanIgnoreStareForEggCarriers`
   - `angerNeutralMobsToEggCarriers`
