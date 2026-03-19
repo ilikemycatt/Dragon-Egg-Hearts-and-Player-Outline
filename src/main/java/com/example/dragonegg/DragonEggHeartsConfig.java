@@ -79,7 +79,7 @@ public final class DragonEggHeartsConfig {
         public boolean blockHopperEggInsertion = true;
         public boolean announceEggCoordinates = true;
         public boolean restoreEggToEndPortalOnLoss = true;
-        public double extraHearts = 10.0;
+        public double extraHearts = 0.0;
         public int eggCoordsMessageIntervalTicks = 72000;
 
         public double extraHealthAmount() {
