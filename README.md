@@ -5,7 +5,7 @@ A Fabric mod for Minecraft 1.21.11 where carrying a Dragon Egg grants bonus max 
 ## Features
 
 - Bonus hearts while a Dragon Egg is in your player inventory.
-- Bonus max health stays persistent across relog/rejoin while carrying the egg.
+- Bonus max health will save across relog/rejoin while carrying the egg.
 - Optional glowing outline while carrying a Dragon Egg.
 - Optional red player name while carrying a Dragon Egg.
 - Optional restriction to prevent storing Dragon Eggs in containers/shulkers/bundles.
@@ -13,10 +13,11 @@ A Fabric mod for Minecraft 1.21.11 where carrying a Dragon Egg grants bonus max 
 - Optional allay interaction blocking and fox pickup blocking for Dragon Eggs.
 - Optional item frame interaction blocking for Dragon Eggs.
 - Optional Enderman stare-aggro immunity for Dragon Egg carriers.
-- Optional mob-targeting behavior where neutral mobs aggro and hostiles prioritize egg carriers.
-- Optional Dragon Egg coordinate chat announcements after placement/teleport tracking.
+- Optional mob-targeting behavior where neutral mobs, excluding endermen, will become aggro
+  towards egg carrier and hostiles mobs will prioritize egg carrier over other players.
+- Optional Dragon Egg coordinate chat announcements when it is placed down.
 - Optional Dragon Egg restore-to-End-portal protection for void/hazard loss.
-- Configurable bonus heart amount.
+- Configurable bonus heart amount when doubleHearts is set to false.
 
 ## Requirements
 
