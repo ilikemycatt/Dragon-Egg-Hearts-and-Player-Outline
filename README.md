@@ -2,6 +2,10 @@
 
 A Fabric mod for Minecraft 1.21.11 where carrying a Dragon Egg grants bonus max health.
 
+## Download
+
+https://modrinth.com/mod/dragon-egg-hearts
+
 ## Features
 
 - Bonus hearts while a Dragon Egg is in your player inventory.
