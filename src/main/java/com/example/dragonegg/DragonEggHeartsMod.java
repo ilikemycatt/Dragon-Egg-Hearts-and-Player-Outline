@@ -5,37 +5,36 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.entity.mob.EndermanEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.passive.AllayEntity;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.decoration.ItemFrameEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.EntityEquipmentUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.UpdateSelectedSlotS2CPacket;
-import net.minecraft.scoreboard.Scoreboard;
-import net.minecraft.scoreboard.Team;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
+import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
-
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.allay.Allay;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.Scoreboard;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -46,7 +45,7 @@ import java.util.UUID;
 
 public class DragonEggHeartsMod implements ModInitializer {
     private static final String MOD_ID = "dragonegghearts";
-    private static final Identifier MODIFIER_ID = Identifier.of(MOD_ID, "dragon_egg_health");
+    private static final Identifier MODIFIER_ID = Identifier.fromNamespaceAndPath(MOD_ID, "dragon_egg_health");
     private static final String RED_TEAM_NAME = "dragonegghearts_red";
     private static final int RESPAWN_SETTLE_TICKS = 20;
     private static final int NEUTRAL_AGGRO_RADIUS = 24;
@@ -72,53 +71,53 @@ public class DragonEggHeartsMod implements ModInitializer {
         DragonEggHeartsConfig.load();
 
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (!isDragonEgg(player.getMainHandStack()) && !isDragonEgg(player.getOffHandStack())) {
-                return ActionResult.PASS;
+            if (!isDragonEgg(player.getMainHandItem()) && !isDragonEgg(player.getOffhandItem())) {
+                return InteractionResult.PASS;
             }
 
             DragonEggHeartsConfig.ConfigData config = DragonEggHeartsConfig.get();
 
-            if (config.blockAllayEggInteractions && entity instanceof AllayEntity allay) {
-                if (!world.isClient()
-                        && world instanceof ServerWorld serverWorld
-                        && player instanceof ServerPlayerEntity serverPlayer) {
+            if (config.blockAllayEggInteractions && entity instanceof Allay allay) {
+                if (!world.isClientSide()
+                        && world instanceof ServerLevel serverWorld
+                        && player instanceof ServerPlayer serverPlayer) {
                     stripDragonEggFromAllay(serverWorld, allay, "UseEntityCallback");
                     notifyAllayEggInteractionBlocked(serverPlayer, "UseEntityCallback");
                     syncBlockedAllayInteraction(serverPlayer, allay, "UseEntityCallback");
                 }
-                return ActionResult.FAIL;
+                return InteractionResult.FAIL;
             }
 
-            if (config.blockEggUseOnItemFrames && entity instanceof ItemFrameEntity) {
-                if (!world.isClient()) {
-                    ServerWorld serverWorld = (ServerWorld) world;
-                    int nowTick = serverWorld.getServer().getTicks();
-                    Integer previousTick = lastEntityUseWarningTick.get(player.getUuid());
+            if (config.blockEggUseOnItemFrames && entity instanceof ItemFrame) {
+                if (!world.isClientSide()) {
+                    ServerLevel serverWorld = (ServerLevel) world;
+                    int nowTick = serverWorld.getServer().getTickCount();
+                    Integer previousTick = lastEntityUseWarningTick.get(player.getUUID());
                     if (previousTick == null || nowTick != previousTick) {
-                        player.sendMessage(Text.literal("Dragon Egg cannot be used with that entity."), false);
-                        lastEntityUseWarningTick.put(player.getUuid(), nowTick);
+                        player.sendSystemMessage(Component.literal("Dragon Egg cannot be used with that entity."));
+                        lastEntityUseWarningTick.put(player.getUUID(), nowTick);
                     }
                 }
-                return ActionResult.FAIL;
+                return InteractionResult.FAIL;
             }
 
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             Scoreboard scoreboard = server.getScoreboard();
             Set<UUID> online = new HashSet<>();
 
-            server.getPlayerManager().getPlayerList().forEach(player -> {
-                online.add(player.getUuid());
+            server.getPlayerList().getPlayers().forEach(player -> {
+                online.add(player.getUUID());
 
-                Integer settle = respawnSettleTicks.get(player.getUuid());
+                Integer settle = respawnSettleTicks.get(player.getUUID());
                 if (settle != null) {
                     if (settle > 0) {
-                        respawnSettleTicks.put(player.getUuid(), settle - 1);
+                        respawnSettleTicks.put(player.getUUID(), settle - 1);
                         return;
                     }
-                    respawnSetleDone(player.getUuid());
+                    respawnSetleDone(player.getUUID());
                 }
 
                 checkAndApply(player, scoreboard);
@@ -134,39 +133,39 @@ public class DragonEggHeartsMod implements ModInitializer {
         });
 
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
-            UUID uuid = newPlayer.getUuid();
+            UUID uuid = newPlayer.getUUID();
             hadEggLastTick.remove(uuid);
             eggCarrierCache.remove(uuid);
             respawnSettleTicks.put(uuid, RESPAWN_SETTLE_TICKS);
         });
     }
 
-    private void checkAndApply(ServerPlayerEntity player, Scoreboard scoreboard) {
+    private void checkAndApply(ServerPlayer player, Scoreboard scoreboard) {
         if (!player.isAlive() || player.isRemoved()) return;
 
         boolean hasEgg = hasDragonEgg(player);
         DragonEggHeartsConfig.ConfigData config = DragonEggHeartsConfig.get();
         double desiredExtraHealth = config.extraHealthAmount();
-        UUID uuid = player.getUuid();
+        UUID uuid = player.getUUID();
         Boolean hadEgg = hadEggLastTick.get(uuid);
-        EntityAttributeInstance inst = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+        AttributeInstance inst = player.getAttribute(Attributes.MAX_HEALTH);
         if (inst == null) return;
 
         if (hasEgg) {
             eggCarrierCache.add(uuid);
-            EntityAttributeModifier existingMod = inst.getModifier(MODIFIER_ID);
-            if (existingMod == null || Double.compare(existingMod.value(), desiredExtraHealth) != 0) {
+            AttributeModifier existingMod = inst.getModifier(MODIFIER_ID);
+            if (existingMod == null || Double.compare(existingMod.amount(), desiredExtraHealth) != 0) {
                 if (existingMod != null) {
                     inst.removeModifier(MODIFIER_ID);
                 }
-                EntityAttributeModifier mod = new EntityAttributeModifier(
+                AttributeModifier mod = new AttributeModifier(
                         MODIFIER_ID,
                         desiredExtraHealth,
-                        EntityAttributeModifier.Operation.ADD_VALUE
+                        AttributeModifier.Operation.ADD_VALUE
                 );
                 // Persistent modifier prevents relog from clamping players back to base
                 // health before this mod reapplies the dragon egg bonus.
-                inst.addPersistentModifier(mod);
+                inst.addPermanentModifier(mod);
                 if (player.getHealth() > inst.getValue()) player.setHealth((float) inst.getValue());
             }
 
@@ -177,10 +176,10 @@ public class DragonEggHeartsMod implements ModInitializer {
                 removeVisualStyle(player, scoreboard);
             }
             if (hadEgg == null || !hadEgg) {
-                player.setGlowing(config.outline);
+                player.setGlowingTag(config.outline);
             }
 
-            if (player.age % 10 == 0) {
+            if (player.tickCount % 10 == 0) {
                 if (config.angerNeutralMobsToEggCarriers) {
                     angerNeutralMobs(player);
                 }
@@ -197,68 +196,68 @@ public class DragonEggHeartsMod implements ModInitializer {
 
             if (hadEgg == null || hadEgg) {
                 removeVisualStyle(player, scoreboard);
-                player.setGlowing(false);
+                player.setGlowingTag(false);
             }
         }
 
         hadEggLastTick.put(uuid, hasEgg);
     }
 
-    private void angerNeutralMobs(ServerPlayerEntity player) {
-        Box box = player.getBoundingBox().expand(NEUTRAL_AGGRO_RADIUS);
-        ((ServerWorld) player.getEntityWorld()).getEntitiesByClass(MobEntity.class, box,
-                mob -> mob instanceof Angerable && !(mob instanceof EndermanEntity)
+    private void angerNeutralMobs(ServerPlayer player) {
+        AABB box = player.getBoundingBox().inflate(NEUTRAL_AGGRO_RADIUS);
+        ((ServerLevel) player.level()).getEntitiesOfClass(Mob.class, box,
+                mob -> mob instanceof NeutralMob && !(mob instanceof EnderMan)
         ).forEach(mob -> {
             if (mob.getTarget() == player) {
                 return;
             }
-            Angerable angerable = (Angerable) mob;
-            angerable.chooseRandomAngerTime();
+            NeutralMob angerable = (NeutralMob) mob;
+            angerable.startPersistentAngerTimer();
             mob.setTarget(player);
         });
     }
 
-    private void prioritizeHostileMobs(ServerPlayerEntity player) {
-        Box box = player.getBoundingBox().expand(HOSTILE_PRIORITY_RADIUS);
-        ((ServerWorld) player.getEntityWorld()).getEntitiesByClass(HostileEntity.class, box,
-                hostile -> !(hostile instanceof EndermanEntity)
+    private void prioritizeHostileMobs(ServerPlayer player) {
+        AABB box = player.getBoundingBox().inflate(HOSTILE_PRIORITY_RADIUS);
+        ((ServerLevel) player.level()).getEntitiesOfClass(Monster.class, box,
+                hostile -> !(hostile instanceof EnderMan)
         ).forEach(hostile -> {
             Entity currentTarget = hostile.getTarget();
-            if (!(currentTarget instanceof ServerPlayerEntity currentPlayer)
+            if (!(currentTarget instanceof ServerPlayer currentPlayer)
                     || !isEggCarrierCached(currentPlayer)
-                    || hostile.squaredDistanceTo(player) < hostile.squaredDistanceTo(currentPlayer)) {
+                    || hostile.distanceToSqr(player) < hostile.distanceToSqr(currentPlayer)) {
                 hostile.setTarget(player);
             }
         });
     }
 
-    private void applyVisualStyle(ServerPlayerEntity player, Scoreboard scoreboard) {
-        Team redTeam = getOrCreateRedTeam(scoreboard);
-        String scoreHolder = player.getNameForScoreboard();
-        Team currentTeam = scoreboard.getScoreHolderTeam(scoreHolder);
+    private void applyVisualStyle(ServerPlayer player, Scoreboard scoreboard) {
+        PlayerTeam redTeam = getOrCreateRedTeam(scoreboard);
+        String scoreHolder = player.getScoreboardName();
+        PlayerTeam currentTeam = scoreboard.getPlayersTeam(scoreHolder);
         if (currentTeam != redTeam) {
             if (currentTeam != null) {
-                scoreboard.removeScoreHolderFromTeam(scoreHolder, currentTeam);
+                scoreboard.removePlayerFromTeam(scoreHolder, currentTeam);
             }
-            scoreboard.addScoreHolderToTeam(scoreHolder, redTeam);
+            scoreboard.addPlayerToTeam(scoreHolder, redTeam);
         }
     }
 
-    private void removeVisualStyle(ServerPlayerEntity player, Scoreboard scoreboard) {
-        String scoreHolder = player.getNameForScoreboard();
-        Team currentTeam = scoreboard.getScoreHolderTeam(scoreHolder);
-        Team redTeam = scoreboard.getTeam(RED_TEAM_NAME);
+    private void removeVisualStyle(ServerPlayer player, Scoreboard scoreboard) {
+        String scoreHolder = player.getScoreboardName();
+        PlayerTeam currentTeam = scoreboard.getPlayersTeam(scoreHolder);
+        PlayerTeam redTeam = scoreboard.getPlayerTeam(RED_TEAM_NAME);
         if (currentTeam != null && currentTeam == redTeam) {
-            scoreboard.removeScoreHolderFromTeam(scoreHolder, currentTeam);
+            scoreboard.removePlayerFromTeam(scoreHolder, currentTeam);
         }
     }
 
-    private Team getOrCreateRedTeam(Scoreboard scoreboard) {
-        Team redTeam = scoreboard.getTeam(RED_TEAM_NAME);
+    private PlayerTeam getOrCreateRedTeam(Scoreboard scoreboard) {
+        PlayerTeam redTeam = scoreboard.getPlayerTeam(RED_TEAM_NAME);
         if (redTeam == null) {
-            redTeam = scoreboard.addTeam(RED_TEAM_NAME);
+            redTeam = scoreboard.addPlayerTeam(RED_TEAM_NAME);
         }
-        redTeam.setColor(Formatting.RED);
+        redTeam.setColor(ChatFormatting.RED);
         return redTeam;
     }
 
@@ -272,7 +271,7 @@ public class DragonEggHeartsMod implements ModInitializer {
             return;
         }
 
-        int nowTick = server.getTicks();
+        int nowTick = server.getTickCount();
 
         // First process pending placement verifications scheduled for this tick.
         Iterator<Map.Entry<EggAnnouncement, Integer>> verifyIterator = pendingPlacementVerificationTick.entrySet().iterator();
@@ -283,17 +282,17 @@ public class DragonEggHeartsMod implements ModInitializer {
 
             EggAnnouncement announcement = entry.getKey();
             verifyIterator.remove();
-            ServerWorld world = server.getWorld(announcement.world());
+            ServerLevel world = server.getLevel(announcement.world());
             if (world == null) {
                 nextEggCoordsMessageTick.remove(announcement);
                 missingEggRetryCount.remove(announcement);
                 continue;
             }
 
-            if (!world.getBlockState(announcement.pos()).isOf(Blocks.DRAGON_EGG)) {
+            if (!world.getBlockState(announcement.pos()).is(Blocks.DRAGON_EGG)) {
                 BlockPos movedPos = findNearbyDragonEgg(world, announcement.pos(), DRAGON_EGG_TELEPORT_SEARCH_RADIUS);
                 if (movedPos != null) {
-                    EggAnnouncement movedAnnouncement = new EggAnnouncement(announcement.world(), movedPos.toImmutable());
+                    EggAnnouncement movedAnnouncement = new EggAnnouncement(announcement.world(), movedPos.immutable());
                     if (verificationReplacements == null) {
                         verificationReplacements = new HashMap<>();
                     }
@@ -339,7 +338,7 @@ public class DragonEggHeartsMod implements ModInitializer {
         while (iterator.hasNext()) {
             Map.Entry<EggAnnouncement, Integer> entry = iterator.next();
             EggAnnouncement announcement = entry.getKey();
-            ServerWorld world = server.getWorld(announcement.world());
+            ServerLevel world = server.getLevel(announcement.world());
             if (world == null) {
                 iterator.remove();
                 pendingPlacementVerificationTick.remove(announcement);
@@ -351,7 +350,7 @@ public class DragonEggHeartsMod implements ModInitializer {
                 continue;
             }
 
-            if (!world.getBlockState(announcement.pos()).isOf(Blocks.DRAGON_EGG)) {
+            if (!world.getBlockState(announcement.pos()).is(Blocks.DRAGON_EGG)) {
                 BlockPos movedPos = findNearbyDragonEgg(world, announcement.pos(), DRAGON_EGG_TELEPORT_SEARCH_RADIUS);
                 if (movedPos == null) {
                     int retries = missingEggRetryCount.getOrDefault(announcement, 0) + 1;
@@ -375,7 +374,7 @@ public class DragonEggHeartsMod implements ModInitializer {
                     continue;
                 }
 
-                EggAnnouncement movedAnnouncement = new EggAnnouncement(announcement.world(), movedPos.toImmutable());
+                EggAnnouncement movedAnnouncement = new EggAnnouncement(announcement.world(), movedPos.immutable());
                 if (replacements == null) {
                     replacements = new HashMap<>();
                 }
@@ -405,58 +404,58 @@ public class DragonEggHeartsMod implements ModInitializer {
         return !stack.isEmpty() && stack.getItem() == Items.DRAGON_EGG;
     }
 
-    public static boolean playerHasDragonEggInEitherHand(PlayerEntity player) {
-        return isDragonEgg(player.getMainHandStack()) || isDragonEgg(player.getOffHandStack());
+    public static boolean playerHasDragonEggInEitherHand(Player player) {
+        return isDragonEgg(player.getMainHandItem()) || isDragonEgg(player.getOffhandItem());
     }
 
-    public static boolean stripDragonEggFromAllay(ServerWorld world, AllayEntity allay, String source) {
+    public static boolean stripDragonEggFromAllay(ServerLevel world, Allay allay, String source) {
         boolean droppedEgg = false;
-        for (Hand hand : Hand.values()) {
-            ItemStack stackInHand = allay.getStackInHand(hand);
+        for (InteractionHand hand : InteractionHand.values()) {
+            ItemStack stackInHand = allay.getItemInHand(hand);
             if (!isDragonEgg(stackInHand)) {
                 continue;
             }
 
             ItemStack dropped = stackInHand.copy();
-            allay.setStackInHand(hand, ItemStack.EMPTY);
-            allay.dropStack(world, dropped);
+            allay.setItemInHand(hand, ItemStack.EMPTY);
+            allay.spawnAtLocation(world, dropped);
             droppedEgg = true;
         }
 
-        for (int slot = 0; slot < allay.getInventory().size(); slot++) {
-            ItemStack stack = allay.getInventory().getStack(slot);
+        for (int slot = 0; slot < allay.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = allay.getInventory().getItem(slot);
             if (!isDragonEgg(stack)) {
                 continue;
             }
 
             ItemStack dropped = stack.copy();
-            allay.getInventory().setStack(slot, ItemStack.EMPTY);
-            allay.dropStack(world, dropped);
+            allay.getInventory().setItem(slot, ItemStack.EMPTY);
+            allay.spawnAtLocation(world, dropped);
             droppedEgg = true;
         }
 
         if (droppedEgg && DragonEggHeartsConfig.get().debugLogging) {
             System.out.println("[DragonEggHearts][AllayBlock] stripped egg from allay id="
-                    + allay.getId() + " at " + allay.getBlockPos() + " source=" + source);
+                    + allay.getId() + " at " + allay.blockPosition() + " source=" + source);
         }
 
         return droppedEgg;
     }
 
-    public static void notifyAllayEggInteractionBlocked(ServerPlayerEntity player, String source) {
-        MinecraftServer server = ((ServerWorld) player.getEntityWorld()).getServer();
+    public static void notifyAllayEggInteractionBlocked(ServerPlayer player, String source) {
+        MinecraftServer server = ((ServerLevel) player.level()).getServer();
         if (server == null) {
             return;
         }
 
-        int nowTick = server.getTicks();
-        Integer previousTick = lastAllayBlockWarningTick.get(player.getUuid());
+        int nowTick = server.getTickCount();
+        Integer previousTick = lastAllayBlockWarningTick.get(player.getUUID());
         if (previousTick != null && nowTick - previousTick < ALLAY_WARNING_COOLDOWN_TICKS) {
             return;
         }
 
-        player.sendMessage(Text.literal("Dragon Egg cannot be given to allays."), false);
-        lastAllayBlockWarningTick.put(player.getUuid(), nowTick);
+        player.sendSystemMessage(Component.literal("Dragon Egg cannot be given to allays."));
+        lastAllayBlockWarningTick.put(player.getUUID(), nowTick);
 
         if (DragonEggHeartsConfig.get().debugLogging) {
             System.out.println("[DragonEggHearts][AllayBlock] source=" + source
@@ -465,26 +464,26 @@ public class DragonEggHeartsMod implements ModInitializer {
         }
     }
 
-    public static void syncBlockedAllayInteraction(ServerPlayerEntity player, AllayEntity allay, String source) {
+    public static void syncBlockedAllayInteraction(ServerPlayer player, Allay allay, String source) {
         // Force a corrective sync so client-side interaction prediction cannot
         // leave a ghost "allay is holding egg" state.
-        player.playerScreenHandler.syncState();
-        if (player.currentScreenHandler != player.playerScreenHandler) {
-            player.currentScreenHandler.syncState();
+        player.inventoryMenu.sendAllDataToRemote();
+        if (player.containerMenu != player.inventoryMenu) {
+            player.containerMenu.sendAllDataToRemote();
         }
 
         int selectedSlot = player.getInventory().getSelectedSlot();
-        player.networkHandler.sendPacket(new UpdateSelectedSlotS2CPacket(selectedSlot));
-        player.networkHandler.sendPacket(player.getInventory().createSlotSetPacket(selectedSlot));
+        player.connection.send(new ClientboundSetHeldSlotPacket(selectedSlot));
+        player.connection.send(player.getInventory().createInventoryUpdatePacket(selectedSlot));
 
-        EntityEquipmentUpdateS2CPacket packet = new EntityEquipmentUpdateS2CPacket(
+        ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(
                 allay.getId(),
                 List.of(
-                        Pair.of(EquipmentSlot.MAINHAND, allay.getMainHandStack().copy()),
-                        Pair.of(EquipmentSlot.OFFHAND, allay.getOffHandStack().copy())
+                        Pair.of(EquipmentSlot.MAINHAND, allay.getMainHandItem().copy()),
+                        Pair.of(EquipmentSlot.OFFHAND, allay.getOffhandItem().copy())
                 )
         );
-        player.networkHandler.sendPacket(packet);
+        player.connection.send(packet);
 
         if (DragonEggHeartsConfig.get().debugLogging) {
             System.out.println("[DragonEggHearts][AllayBlock] forced inventory/equipment sync source="
@@ -492,30 +491,30 @@ public class DragonEggHeartsMod implements ModInitializer {
         }
     }
 
-    public static void notifyEggPlaced(ServerPlayerEntity player, BlockPos eggPos) {
-        MinecraftServer server = ((ServerWorld) player.getEntityWorld()).getServer();
+    public static void notifyEggPlaced(ServerPlayer player, BlockPos eggPos) {
+        MinecraftServer server = ((ServerLevel) player.level()).getServer();
         if (server == null) {
             return;
         }
 
         EggAnnouncement announcement = new EggAnnouncement(
-                player.getEntityWorld().getRegistryKey(),
-                eggPos.toImmutable()
+                player.level().dimension(),
+                eggPos.immutable()
         );
         scheduleEggAnnouncement(server, announcement);
     }
 
     // Public helper to schedule an announcement when a dragon egg is placed
     // without a player context (e.g. teleport, other mods, or direct setBlockState).
-    public static void notifyEggPlaced(ServerWorld world, BlockPos eggPos) {
+    public static void notifyEggPlaced(ServerLevel world, BlockPos eggPos) {
         MinecraftServer server = world.getServer();
         if (server == null) return;
 
-        EggAnnouncement announcement = new EggAnnouncement(world.getRegistryKey(), eggPos.toImmutable());
+        EggAnnouncement announcement = new EggAnnouncement(world.dimension(), eggPos.immutable());
         scheduleEggAnnouncement(server, announcement);
     }
 
-    public static void notifyEggTeleported(ServerWorld world, BlockPos oldPos, BlockPos newPos) {
+    public static void notifyEggTeleported(ServerLevel world, BlockPos oldPos, BlockPos newPos) {
         MinecraftServer server = world.getServer();
         if (server == null) {
             return;
@@ -526,8 +525,8 @@ public class DragonEggHeartsMod implements ModInitializer {
             return;
         }
 
-        EggAnnouncement target = new EggAnnouncement(world.getRegistryKey(), newPos.toImmutable());
-        int nowTick = server.getTicks();
+        EggAnnouncement target = new EggAnnouncement(world.dimension(), newPos.immutable());
+        int nowTick = server.getTickCount();
         clearAllEggAnnouncements();
         nextEggCoordsMessageTick.put(target, nowTick + getEggCoordsMessageIntervalTicks());
         pendingPlacementVerificationTick.put(target, nowTick + 1);
@@ -544,7 +543,7 @@ public class DragonEggHeartsMod implements ModInitializer {
             return;
         }
 
-        int nowTick = server.getTicks();
+        int nowTick = server.getTickCount();
         int scheduledTick = nowTick + getEggCoordsMessageIntervalTicks();
         Integer existing = nextEggCoordsMessageTick.get(announcement);
         if (existing != null && existing == scheduledTick) {
@@ -568,7 +567,7 @@ public class DragonEggHeartsMod implements ModInitializer {
         missingEggRetryCount.clear();
     }
 
-    public static void rebindEggAnnouncementAfterTeleport(ServerWorld world, BlockPos oldPos) {
+    public static void rebindEggAnnouncementAfterTeleport(ServerLevel world, BlockPos oldPos) {
         BlockPos newPos = findNearbyDragonEgg(world, oldPos, DRAGON_EGG_TELEPORT_SEARCH_RADIUS);
         if (newPos == null) {
             return;
@@ -578,13 +577,13 @@ public class DragonEggHeartsMod implements ModInitializer {
     }
 
     private static void broadcastEggCoords(MinecraftServer server, EggAnnouncement announcement) {
-        if (server.getWorld(announcement.world()) == null) {
+        if (server.getLevel(announcement.world()) == null) {
             return;
         }
 
-        Text message = Text.empty()
-                .append(Text.literal("Dragon Egg").formatted(Formatting.LIGHT_PURPLE))
-                .append(Text.literal(
+        Component message = Component.empty()
+                .append(Component.literal("Dragon Egg").withStyle(ChatFormatting.LIGHT_PURPLE))
+                .append(Component.literal(
                         " is in " + getDimensionName(announcement.world())
                                 + " at X=" + announcement.pos().getX()
                                 + " Y=" + announcement.pos().getY()
@@ -594,22 +593,22 @@ public class DragonEggHeartsMod implements ModInitializer {
             System.out.println("[DragonEggHearts] Broadcast egg coords for "
                     + announcement.pos() + " in world " + announcement.world());
         }
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.sendMessage(message, false);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(message);
         }
     }
 
-    private static String getDimensionName(net.minecraft.registry.RegistryKey<World> worldKey) {
-        if (worldKey.equals(World.OVERWORLD)) {
+    private static String getDimensionName(net.minecraft.resources.ResourceKey<Level> worldKey) {
+        if (worldKey.equals(Level.OVERWORLD)) {
             return "Overworld";
         }
-        if (worldKey.equals(World.NETHER)) {
+        if (worldKey.equals(Level.NETHER)) {
             return "Nether";
         }
-        if (worldKey.equals(World.END)) {
+        if (worldKey.equals(Level.END)) {
             return "End";
         }
-        return worldKey.getValue().toString();
+        return worldKey.identifier().toString();
     }
 
     public static void restoreEggToEndPortal(MinecraftServer server) {
@@ -617,38 +616,38 @@ public class DragonEggHeartsMod implements ModInitializer {
             return;
         }
 
-        ServerWorld endWorld = server.getWorld(World.END);
+        ServerLevel endWorld = server.getLevel(Level.END);
         if (endWorld == null) {
             return;
         }
 
         BlockPos portalEggPos = findEndPortalEggPosition(endWorld);
-        if (endWorld.getBlockState(portalEggPos).isOf(Blocks.DRAGON_EGG)) {
+        if (endWorld.getBlockState(portalEggPos).is(Blocks.DRAGON_EGG)) {
             return;
         }
 
-        endWorld.breakBlock(portalEggPos, false);
-        endWorld.setBlockState(portalEggPos, Blocks.DRAGON_EGG.getDefaultState(), 3);
+        endWorld.destroyBlock(portalEggPos, false);
+        endWorld.setBlock(portalEggPos, Blocks.DRAGON_EGG.defaultBlockState(), 3);
     }
 
-    private static BlockPos findEndPortalEggPosition(ServerWorld endWorld) {
-        BlockPos origin = BlockPos.ORIGIN;
+    private static BlockPos findEndPortalEggPosition(ServerLevel endWorld) {
+        BlockPos origin = BlockPos.ZERO;
 
         int x = origin.getX();
         int z = origin.getZ();
-        for (int y = endWorld.getTopYInclusive(); y >= endWorld.getBottomY(); y--) {
+        for (int y = endWorld.getMaxY(); y >= endWorld.getMinY(); y--) {
             BlockPos pos = new BlockPos(x, y, z);
-            if (endWorld.getBlockState(pos).isOf(Blocks.BEDROCK)) {
-                return pos.up();
+            if (endWorld.getBlockState(pos).is(Blocks.BEDROCK)) {
+                return pos.above();
             }
         }
 
         return new BlockPos(x, 64, z);
     }
 
-    public static boolean hasDragonEgg(ServerPlayerEntity player) {
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
+    public static boolean hasDragonEgg(ServerPlayer player) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
             if (isDragonEgg(stack)) return true;
         }
         return false;
@@ -662,29 +661,29 @@ public class DragonEggHeartsMod implements ModInitializer {
         return DragonEggHeartsConfig.get().restoreEggToEndPortalOnLoss;
     }
 
-    public static boolean isEggCarrierCached(ServerPlayerEntity player) {
-        return eggCarrierCache.contains(player.getUuid());
+    public static boolean isEggCarrierCached(ServerPlayer player) {
+        return eggCarrierCache.contains(player.getUUID());
     }
 
     private static int getEggCoordsMessageIntervalTicks() {
         return DragonEggHeartsConfig.get().eggCoordsMessageIntervalTicks;
     }
 
-    private static BlockPos findNearbyDragonEgg(ServerWorld world, BlockPos origin, int radius) {
+    private static BlockPos findNearbyDragonEgg(ServerLevel world, BlockPos origin, int radius) {
         int minX = origin.getX() - radius;
         int maxX = origin.getX() + radius;
-        int minY = Math.max(world.getBottomY(), origin.getY() - radius);
-        int maxY = Math.min(world.getTopYInclusive(), origin.getY() + radius);
+        int minY = Math.max(world.getMinY(), origin.getY() - radius);
+        int maxY = Math.min(world.getMaxY(), origin.getY() + radius);
         int minZ = origin.getZ() - radius;
         int maxZ = origin.getZ() + radius;
 
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     mutable.set(x, y, z);
-                    if (world.getBlockState(mutable).isOf(Blocks.DRAGON_EGG)) {
-                        return mutable.toImmutable();
+                    if (world.getBlockState(mutable).is(Blocks.DRAGON_EGG)) {
+                        return mutable.immutable();
                     }
                 }
             }
@@ -693,6 +692,6 @@ public class DragonEggHeartsMod implements ModInitializer {
         return null;
     }
 
-    private record EggAnnouncement(net.minecraft.registry.RegistryKey<World> world, BlockPos pos) {
+    private record EggAnnouncement(net.minecraft.resources.ResourceKey<Level> world, BlockPos pos) {
     }
 }

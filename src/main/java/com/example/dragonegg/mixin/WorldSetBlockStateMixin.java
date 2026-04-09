@@ -2,20 +2,20 @@ package com.example.dragonegg.mixin;
 
 import com.example.dragonegg.DragonEggHeartsConfig;
 import com.example.dragonegg.DragonEggHeartsMod;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(World.class)
+@Mixin(Level.class)
 public class WorldSetBlockStateMixin {
     @Inject(
-            method = "setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;II)Z",
+            method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z",
             at = @At("RETURN")
     )
     private void dragonegghearts$trackDragonEggSet(
@@ -29,19 +29,19 @@ public class WorldSetBlockStateMixin {
             return;
         }
 
-        if (!state.isOf(Blocks.DRAGON_EGG)) {
+        if (!state.is(Blocks.DRAGON_EGG)) {
             return;
         }
 
-        World self = (World) (Object) this;
-        if (!(self instanceof ServerWorld serverWorld)) {
+        Level self = (Level) (Object) this;
+        if (!(self instanceof ServerLevel serverWorld)) {
             return;
         }
 
-        DragonEggHeartsMod.notifyEggPlaced(serverWorld, pos.toImmutable());
+        DragonEggHeartsMod.notifyEggPlaced(serverWorld, pos.immutable());
         if (DragonEggHeartsConfig.get().debugLogging) {
             System.out.println("[DragonEggHearts] Tracked dragon egg setBlockState at " + pos
-                    + " in world " + serverWorld.getRegistryKey());
+                    + " in world " + serverWorld.dimension());
         }
     }
 }

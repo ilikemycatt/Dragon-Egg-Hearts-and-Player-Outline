@@ -1,15 +1,15 @@
 package com.example.dragonegg.mixin;
 
 import com.example.dragonegg.DragonEggHeartsConfig;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.text.Text;
-import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.core.NonNullList;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -17,70 +17,70 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ScreenHandler.class)
+@Mixin(AbstractContainerMenu.class)
 public abstract class ScreenHandlerMixin {
     @Shadow
     @Final
-    public DefaultedList<Slot> slots;
+    public NonNullList<Slot> slots;
 
-    @Inject(method = "onSlotClick", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
     private void dragonegghearts$warnAndBlockContainerStore(
             int slotIndex,
             int button,
-            SlotActionType actionType,
-            PlayerEntity player,
+            ContainerInput actionType,
+            Player player,
             CallbackInfo ci
     ) {
         if (DragonEggHeartsConfig.get().allowStorageInContainers) return;
-        if (player.getEntityWorld().isClient()) return;
+        if (player.level().isClientSide()) return;
         if (!shouldBlock(slotIndex, button, actionType, player)) return;
 
-        player.sendMessage(Text.literal("Dragon Egg cannot be stored in containers."), false);
+        player.sendSystemMessage(Component.literal("Dragon Egg cannot be stored in containers."));
         ci.cancel();
     }
 
-    private boolean shouldBlock(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
-        ScreenHandler handler = (ScreenHandler) (Object) this;
+    private boolean shouldBlock(int slotIndex, int button, ContainerInput actionType, Player player) {
+        AbstractContainerMenu handler = (AbstractContainerMenu) (Object) this;
 
-        if (actionType == SlotActionType.PICKUP || actionType == SlotActionType.PICKUP_ALL) {
+        if (actionType == ContainerInput.PICKUP || actionType == ContainerInput.PICKUP_ALL) {
             if (!isContainerSlot(slotIndex)) return false;
-            ItemStack cursor = handler.getCursorStack();
+            ItemStack cursor = handler.getCarried();
             return !cursor.isEmpty() && cursor.getItem() == Items.DRAGON_EGG;
         }
 
-        if (actionType == SlotActionType.QUICK_MOVE) {
-            if (!isValidSlotIndex(slotIndex)) return false;
+        if (actionType == ContainerInput.QUICK_MOVE) {
+            if (!dragonegghearts$isValidSlotIndex(slotIndex)) return false;
             Slot source = this.slots.get(slotIndex);
-            ItemStack sourceStack = source.getStack();
-            return source.inventory instanceof PlayerInventory
+            ItemStack sourceStack = source.getItem();
+            return source.container instanceof Inventory
                     && !sourceStack.isEmpty()
                     && sourceStack.getItem() == Items.DRAGON_EGG
                     && hasContainerSlots();
         }
 
-        if (actionType == SlotActionType.SWAP) {
+        if (actionType == ContainerInput.SWAP) {
             if (!isContainerSlot(slotIndex)) return false;
-            if (button < 0 || button >= PlayerInventory.getHotbarSize()) return false;
-            ItemStack hotbarStack = player.getInventory().getStack(button);
+            if (button < 0 || button >= Inventory.getSelectionSize()) return false;
+            ItemStack hotbarStack = player.getInventory().getItem(button);
             return !hotbarStack.isEmpty() && hotbarStack.getItem() == Items.DRAGON_EGG;
         }
 
         return false;
     }
 
-    private boolean isValidSlotIndex(int slotIndex) {
+    private boolean dragonegghearts$isValidSlotIndex(int slotIndex) {
         return slotIndex >= 0 && slotIndex < this.slots.size();
     }
 
     private boolean isContainerSlot(int slotIndex) {
-        if (!isValidSlotIndex(slotIndex)) return false;
+        if (!dragonegghearts$isValidSlotIndex(slotIndex)) return false;
         Slot slot = this.slots.get(slotIndex);
-        return !(slot.inventory instanceof PlayerInventory);
+        return !(slot.container instanceof Inventory);
     }
 
     private boolean hasContainerSlots() {
         for (Slot slot : this.slots) {
-            if (!(slot.inventory instanceof PlayerInventory)) return true;
+            if (!(slot.container instanceof Inventory)) return true;
         }
         return false;
     }

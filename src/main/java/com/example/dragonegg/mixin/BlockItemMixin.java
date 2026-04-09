@@ -1,14 +1,14 @@
 package com.example.dragonegg.mixin;
 
 import com.example.dragonegg.DragonEggHeartsMod;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.item.Items;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,14 +17,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(BlockItem.class)
 public class BlockItemMixin {
     @Inject(method = "place", at = @At("RETURN"))
-    private void dragonegghearts$announceEggPlacement(ItemPlacementContext context, CallbackInfoReturnable<ActionResult> cir) {
+    private void dragonegghearts$announceEggPlacement(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
         BlockItem self = (BlockItem) (Object) this;
-        if (self.asItem() != Items.DRAGON_EGG || !cir.getReturnValue().isAccepted()) {
+        if (self.asItem() != Items.DRAGON_EGG || !cir.getReturnValue().consumesAction()) {
             return;
         }
 
-        World world = context.getWorld();
-        if (world.isClient() || !(context.getPlayer() instanceof ServerPlayerEntity player)) {
+        Level world = context.getLevel();
+        if (world.isClientSide() || !(context.getPlayer() instanceof ServerPlayer player)) {
             return;
         }
 
@@ -33,17 +33,17 @@ public class BlockItemMixin {
         // the position the egg ends up at, so check a small neighborhood around
         // the clicked position (including the offset side) and choose the one
         // that actually contains the dragon egg block.
-        BlockPos clicked = context.getBlockPos();
+        BlockPos clicked = context.getClickedPos();
         BlockPos placedPos = null;
 
         // Check clicked block and the adjacent offset first.
-        if (world.getBlockState(clicked).isOf(Blocks.DRAGON_EGG)) {
+        if (world.getBlockState(clicked).is(Blocks.DRAGON_EGG)) {
             placedPos = clicked;
         }
 
         if (placedPos == null) {
-            BlockPos offset = clicked.offset(context.getSide());
-            if (world.getBlockState(offset).isOf(Blocks.DRAGON_EGG)) {
+            BlockPos offset = clicked.relative(context.getClickedFace());
+            if (world.getBlockState(offset).is(Blocks.DRAGON_EGG)) {
                 placedPos = offset;
             }
         }
@@ -55,8 +55,8 @@ public class BlockItemMixin {
             for (int dx = -1; dx <= 1 && placedPos == null; dx++) {
                 for (int dy = -1; dy <= 1 && placedPos == null; dy++) {
                     for (int dz = -1; dz <= 1 && placedPos == null; dz++) {
-                        BlockPos check = clicked.add(dx, dy, dz);
-                        if (world.getBlockState(check).isOf(Blocks.DRAGON_EGG)) {
+                        BlockPos check = clicked.offset(dx, dy, dz);
+                        if (world.getBlockState(check).is(Blocks.DRAGON_EGG)) {
                             placedPos = check;
                         }
                     }

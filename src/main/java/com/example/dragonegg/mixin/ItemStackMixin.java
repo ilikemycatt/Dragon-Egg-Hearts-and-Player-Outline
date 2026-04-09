@@ -1,14 +1,14 @@
 package com.example.dragonegg.mixin;
 
 import com.example.dragonegg.DragonEggHeartsMod;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.passive.AllayEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.allay.Allay;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,30 +16,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ItemStack.class)
 public class ItemStackMixin {
-    @Inject(method = "useOnEntity", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "interactLivingEntity", at = @At("HEAD"), cancellable = true)
     private void dragonegghearts$blockEggUseOnAllay(
-            PlayerEntity user,
+            Player user,
             LivingEntity entity,
-            Hand hand,
-            CallbackInfoReturnable<ActionResult> cir
+            InteractionHand hand,
+            CallbackInfoReturnable<InteractionResult> cir
     ) {
         if (!DragonEggHeartsMod.areAllayEggInteractionsBlocked()) {
             return;
         }
 
         ItemStack self = (ItemStack) (Object) this;
-        if (!DragonEggHeartsMod.isDragonEgg(self) || !(entity instanceof AllayEntity)) {
+        if (!DragonEggHeartsMod.isDragonEgg(self) || !(entity instanceof Allay)) {
             return;
         }
 
-        if (!user.getEntityWorld().isClient()
-                && user instanceof ServerPlayerEntity serverPlayer
-                && entity.getEntityWorld() instanceof ServerWorld serverWorld) {
-            AllayEntity allay = (AllayEntity) entity;
+        if (!user.level().isClientSide()
+                && user instanceof ServerPlayer serverPlayer
+                && entity.level() instanceof ServerLevel serverWorld) {
+            Allay allay = (Allay) entity;
             DragonEggHeartsMod.stripDragonEggFromAllay(serverWorld, allay, "ItemStack.useOnEntity");
             DragonEggHeartsMod.notifyAllayEggInteractionBlocked(serverPlayer, "ItemStack.useOnEntity");
             DragonEggHeartsMod.syncBlockedAllayInteraction(serverPlayer, allay, "ItemStack.useOnEntity");
         }
-        cir.setReturnValue(ActionResult.FAIL);
+        cir.setReturnValue(InteractionResult.FAIL);
     }
 }

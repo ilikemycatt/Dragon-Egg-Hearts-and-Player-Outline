@@ -1,32 +1,34 @@
 package com.example.dragonegg.mixin;
 
 import com.example.dragonegg.DragonEggHeartsMod;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.AllayEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.allay.Allay;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(PlayerEntity.class)
+@Mixin(Player.class)
 public class PlayerEntityMixin {
-    @Inject(method = "interact", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "interactOn", at = @At("HEAD"), cancellable = true)
     private void dragonegghearts$blockDragonEggAllayInteract(
             Entity entity,
-            Hand hand,
-            CallbackInfoReturnable<ActionResult> cir
+            InteractionHand hand,
+            Vec3 location,
+            CallbackInfoReturnable<InteractionResult> cir
     ) {
         if (!DragonEggHeartsMod.areAllayEggInteractionsBlocked()) {
             return;
         }
 
-        PlayerEntity self = (PlayerEntity) (Object) this;
-        if (!(entity instanceof AllayEntity allay)) {
+        Player self = (Player) (Object) this;
+        if (!(entity instanceof Allay allay)) {
             return;
         }
 
@@ -34,13 +36,13 @@ public class PlayerEntityMixin {
             return;
         }
 
-        if (self instanceof ServerPlayerEntity serverPlayer
-                && DragonEggHeartsMod.isDragonEgg(self.getStackInHand(hand))) {
-            DragonEggHeartsMod.stripDragonEggFromAllay((ServerWorld) self.getEntityWorld(), allay, "PlayerEntity.interact");
+        if (self instanceof ServerPlayer serverPlayer
+                && DragonEggHeartsMod.isDragonEgg(self.getItemInHand(hand))) {
+            DragonEggHeartsMod.stripDragonEggFromAllay((ServerLevel) self.level(), allay, "PlayerEntity.interact");
             DragonEggHeartsMod.notifyAllayEggInteractionBlocked(serverPlayer, "PlayerEntity.interact");
             DragonEggHeartsMod.syncBlockedAllayInteraction(serverPlayer, allay, "PlayerEntity.interact");
         }
 
-        cir.setReturnValue(ActionResult.FAIL);
+        cir.setReturnValue(InteractionResult.FAIL);
     }
 }
