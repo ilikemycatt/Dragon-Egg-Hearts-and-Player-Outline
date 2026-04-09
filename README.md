@@ -21,7 +21,7 @@ A Fabric mod for Minecraft 26.1 where carrying a Dragon Egg grants bonus max hea
 
 ## Requirements
 
-- Minecraft `26.1`
+- Minecraft `26.1.x`
 - Fabric Loader `0.18.4+`
 - Fabric API
 - Java `25`
