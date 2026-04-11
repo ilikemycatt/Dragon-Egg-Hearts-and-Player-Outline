@@ -1,6 +1,6 @@
 # Dragon Egg Hearts
 
-A Fabric mod for Minecraft 26.1 where carrying a Dragon Egg grants bonus max health.
+A Fabric mod for Minecraft 26.1.x where carrying a Dragon Egg grants bonus max health.
 
 ## Features
 
@@ -21,14 +21,14 @@ A Fabric mod for Minecraft 26.1 where carrying a Dragon Egg grants bonus max hea
 
 ## Requirements
 
-- Minecraft `26.1.x`
-- Fabric Loader `0.18.4+`
+- Minecraft `26.1`, `26.1.1`, or `26.1.2`
+- Fabric Loader `0.18.6+`
 - Fabric API
 - Java `25`
 
 ## Installation
 
-1. Install Fabric Loader for Minecraft 26.1.
+1. Install Fabric Loader for your Minecraft version (`26.1`, `26.1.1`, or `26.1.2`).
 2. Install Fabric API.
 3. Put the mod `.jar` file in your `mods` folder.
 4. Start the game/server once to generate config.

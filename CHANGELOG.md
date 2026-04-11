@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 - 2026-04-11
+- Updated the mod for Minecraft 26.1.1 and 26.1.2.
+- Retargeted the build to Minecraft 26.1.2 with Fabric Loader 0.18.6+ and Fabric API 0.145.4+26.1.2.
+- Declared compatibility for the full Minecraft 26.1 through 26.1.2 patch range.
+
 ## 1.0.2 - 2026-04-08
 - Ported the mod to Minecraft 26.1 on Fabric.
 - Updated the development/build toolchain to Fabric Loom 1.15.4 and Gradle 9.4.0.
